@@ -17,6 +17,7 @@ double t; // Time (ms)
 int stimtime = (int)(0.6/dt_max+0.6); //Time period during which stimulus is applied 
 void init();
 void Save_Result(int ncount);
+
 int main(){
 	t = 0.0; // Time (ms)
 	double dt[50001];
@@ -64,7 +65,10 @@ int main(){
 		// ------------------------------------------------------
 		gpuStep_3();
 		t = t + dt_max;//计算performance()时用到，目前程序没有涉及这一步。
-		if (ncount%nstep == 0)Save_Result(ncount);
+		if (ncount%nstep == 0){
+			Send_V();
+			Save_Result(ncount);		
+		}
 		fprintf(tstep, "%g\n", dt[ncount]);
 	}
 	//Send_V();//0
