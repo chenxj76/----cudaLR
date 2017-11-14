@@ -187,13 +187,14 @@ void gpu_adaptiveT(){
 	adaptiveT<<<bpg, tpb>>>(d_dVdt, d_dt,d_kk,d_kk0);
 	cudaDeviceSynchronize();
 }	
-__global__ void Euler(double *d_V, double *d_dVdt, double *d_Vnew, double *d_dt, double *d_t){
+__global__ void Euler(double *d_V, double *d_dVdt, double *d_dt, double *d_t){
 	int k = threadIdx.x + blockIdx.x * blockDim.x;
 	if(k<nx*ny){
 
 	int j = (int)(k/nx);
-	d_Vnew[k] = d_V[k+nx+2+1+2*j] + d_dt[0]*d_dVdt[k];//index是否出问题了？
-    d_V[k+nx+2+1+2*j] = d_Vnew[k];
+	//d_Vnew[k] = d_V[k+nx+2+1+2*j] + d_dt[0]*d_dVdt[k];//index是否出问题了？
+	d_V[k+nx+2+1+2*j]= d_V[k+nx+2+1+2*j] + d_dt[0]*d_dVdt[k];
+   // d_V[k+nx+2+1+2*j] = d_Vnew[k];
 
 	}
 
@@ -210,13 +211,13 @@ void Forward_Euler(){
         //int tpb;
         //tpb = 256;
         bpg = (nx*ny+tpb-1)/tpb;
-	Euler<<<bpg, tpb>>>(d_V, d_dVdt, d_Vnew, d_dt, d_t);
+	Euler<<<bpg, tpb>>>(d_V, d_dVdt, d_dt, d_t);
 	cudaDeviceSynchronize();
 }
 		//*********** part of the step 2 *******
 
 		//*********** step 3, sweep in y-direction, Thomas algorithm used to solve tridiagonal linear equations ADI method*******
-__global__ void step_3(double *d_V ,double *belta ,double *y_temp ,double *f){
+__global__ void step_3(double *d_V ,double *belta ,double *y_temp ,double *f,double *d_Vnew){
 	int k = threadIdx.x + blockIdx.x * blockDim.x;
 	
 	if(k<nx*ny){
@@ -271,13 +272,14 @@ __global__ void step_3(double *d_V ,double *belta ,double *y_temp ,double *f){
 				//V[i][j] = y_temp[j] - belta[j] * V[i][j + 1];
 			if(j!=ny-1)d_V[id] = y_temp[j] - belta[j] * d_V[id+(nx+2)];
 			//}
+			d_Vnew[k]=d_V[id];
 		}
 }
 void gpuStep_3(){
 	int bpg;
 	//tpb = 256;	
     bpg = (nx*ny+tpb-1)/tpb;
-	step_3<<<bpg, tpb>>>(d_V ,belta ,y_temp ,f);
+	step_3<<<bpg, tpb>>>(d_V ,belta ,y_temp ,f, d_Vnew);
 	cudaDeviceSynchronize();
 }	
 	

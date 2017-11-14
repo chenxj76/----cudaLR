@@ -31,16 +31,20 @@ int main(){
 	struct timeb start, end;
     int diff;
 	ftime(&start);
-
+	h_dt[0] = dt_max;
 	Send_to_Device();
+	//Send2deviceT();//0
+	//Send_V();
+	//Send_to_Host();//为什么这些函数放在循环里会出错？
 	int ncount, i, j;
 	
-	for (ncount = 0; ncount <= 500; ncount++){//30000 steps, 600ms
+	for (ncount = 0; ncount <= 5001; ncount++){//30000 steps, 600ms
 		gpu_Boun();
 		gpuStep_1();
 //*********** step 2 *******
 		h_dt[0] = dt_max;
 		//Send2deviceT();//0
+		Manage_Comms(1);
 		gpu_ion();
 		gpu_dVdt();
 		//*****stimulation with a plane waves****
@@ -49,8 +53,10 @@ int main(){
 		}		
 		gpu_adaptiveT();
 		//Send2hostT();//0保存起来看看整过自适应步长有什么规律？
+		Manage_Comms(2);
 		dt[ncount]=	h_dt[0];	
 		//Send2hostK();//0
+		Manage_Comms(3);
 		for (int ttt = 1; ttt <= h_kk[0]; ttt++){ //from t to t+dt_max, t=t+dt
 			gpu_ion();//已经做了gpu_renew_Cai()的动作	
 			gpu_new_gate();				
@@ -66,7 +72,10 @@ int main(){
 		gpuStep_3();
 		t = t + dt_max;//计算performance()时用到，目前程序没有涉及这一步。
 		if (ncount%nstep == 0){
-			Send_V();
+			//Send_V();
+			Manage_Comms(4);
+			//Send_to_Host();
+			Manage_Comms(5);
 			Save_Result(ncount);		
 		}
 		fprintf(tstep, "%g\n", dt[ncount]);
@@ -93,6 +102,12 @@ void init(){
 				h_V[0+(nx+2)*i] = 0.0;
                 h_V[nx+1+i*(nx+2)] = 0.0;
      }
+	 /*
+	 for (i = 0; i < nx+2; i++){
+		for (j = 0; j < ny+2; j++){
+			h_V[i*(nx+2)+j] = -88.654973; // Initial Voltage (mv)
+		}
+	}*/
 	for (i = 0; i < nx; i++){
 		for (j = 0; j < ny; j++){
 			h_V[(i+1)*(nx+2)+j+1] = -88.654973; // Initial Voltage (mv)
@@ -126,9 +141,9 @@ void Save_Result(int ncount){
 					//fprintf(ap, "%g\t", V[i][j]);
 		for (i = 0; i < nx ; i++){
 			for (j = 0; j < ny ; j++){
-					index = i*nx + j;
-                    fprintf(ap, "%g\t", h_Vnew[index]);
-					if (j == ny){
+					index = (i+1)*(nx+2)+j+1;
+                    fprintf(ap, "%g\t", h_V[index]);
+					if (j == ny-1){
 						fprintf(ap, "\n");
 					}
 				//}

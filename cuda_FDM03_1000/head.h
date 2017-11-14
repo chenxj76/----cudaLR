@@ -62,8 +62,9 @@ void gpuStep_3();
 void Allocate();
 void free();
 void Send_to_Device();
-void Send_V();
-void Send2deviceT();
-void Send2hostT();
-void Send2hostK();
-
+void Manage_Comms(int phase);
+//void Send_V();
+//void Send2deviceT();
+//void Send2hostT();
+//void Send2hostK();
+//void Send_to_Host();

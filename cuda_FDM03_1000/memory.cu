@@ -51,12 +51,13 @@ void Allocate(){
 		cudaMalloc((void**)&d_dt, sizeof(double));
 	h_kk = (int*)malloc(sizeof(int));
 		cudaMalloc((void**)&d_kk, sizeof(int));
+		cudaMalloc((void**)&d_kk0, sizeof(int));
 	h_V = (double*)malloc((nx+2)*(ny+2)*sizeof(double));
 		cudaMalloc((void**)&d_V, (nx+2)*(ny+2)*sizeof(double));
 		cudaMalloc((void**)&d_dVdt, size);
 	h_Vnew = (double*)malloc(size);
-		cudaMalloc((void**)&d_Vnew, size);
-
+		Error = cudaMalloc((void**)&d_Vnew, size);
+		printf("CUDA d_Vnew error = %s\n",cudaGetErrorString(Error));	
 		cudaMalloc((void**)&d_it, size);
 
 	h_m = (double*)malloc(size);
@@ -102,6 +103,43 @@ void free(){
 	cudaFree(f);cudaFree(belta);cudaFree(y_temp);
 }
 
+
+
+void Manage_Comms(int phase){
+        cudaError_t Error;
+if (phase==1){
+        Error = cudaMemcpy(d_dt, h_dt, sizeof(double), cudaMemcpyHostToDevice);
+        if (Error != cudaSuccess)
+        printf("CUDA error(copy h_dt->d_dt) = %s\n",cudaGetErrorString(Error));
+}
+
+if (phase==2){   
+        size_t size;
+        size = sizeof(double);
+        Error = cudaMemcpy(h_dt, d_dt, size, cudaMemcpyDeviceToHost);
+        if (Error != cudaSuccess)
+        printf("CUDA error(copy d_dt->h_dt) = %s\n",cudaGetErrorString(Error));
+}
+
+if (phase==3){
+        size_t size;
+        size = sizeof(int);
+        Error = cudaMemcpy(h_kk, d_kk, size, cudaMemcpyDeviceToHost);
+        if (Error != cudaSuccess)
+        printf("CUDA error(copy d_Kk->h_Kk) = %s\n",cudaGetErrorString(Error));
+}
+if (phase==4){
+        Error = cudaMemcpy(h_Vnew,d_Vnew,nx*ny*sizeof(double),cudaMemcpyDeviceToHost);
+        if (Error != cudaSuccess)printf("CUDA error(copy d_Vnew->h_Vnew) = %s\n",cudaGetErrorString(Error));
+}
+if (phase==5){
+		cudaError_t Error;     
+        Error = cudaMemcpy(h_V, d_V, (nx+2)*(ny+2)*sizeof(double), cudaMemcpyDeviceToHost);
+        if (Error != cudaSuccess)
+        printf("CUDA error(copy d_V->h_V) = %s\n",cudaGetErrorString(Error));
+        
+}
+}
 void Send_to_Device(){
         cudaError_t Error;
         size_t size;
@@ -110,7 +148,10 @@ void Send_to_Device(){
 	Error = cudaMemcpy(d_t, h_t, sizeof(double), cudaMemcpyHostToDevice);
         if (Error != cudaSuccess)
         printf("CUDA error(copy h_t->d_t) = %s\n",cudaGetErrorString(Error));
-        Error = cudaMemcpy(d_V, h_V, (nx+2)*(ny+2)*sizeof(double), cudaMemcpyHostToDevice);
+	Error = cudaMemcpy(d_dt, h_dt, sizeof(double), cudaMemcpyHostToDevice);
+       if (Error != cudaSuccess)
+       printf("CUDA error(copy h_dt->d_dt) = %s\n",cudaGetErrorString(Error));
+    Error = cudaMemcpy(d_V, h_V, (nx+2)*(ny+2)*sizeof(double), cudaMemcpyHostToDevice);
         if (Error != cudaSuccess)
         printf("CUDA error(copy h_V->d_V) = %s\n",cudaGetErrorString(Error));
 	Error = cudaMemcpy(d_m, h_m, size, cudaMemcpyHostToDevice);
@@ -135,72 +176,3 @@ void Send_to_Device(){
         if (Error != cudaSuccess)
         printf("CUDA error(copy h_cai->d_cai) = %s\n",cudaGetErrorString(Error));
 }
-void Send_V(){
-        cudaError_t Error;
-        size_t size;
-        size = nx*ny*sizeof(double);
-
-        Error = cudaMemcpy(h_Vnew,d_Vnew,size,cudaMemcpyDeviceToHost);
-        if (Error != cudaSuccess)printf("CUDA error(copy d_Vnew->h_Vnew) = %s\n",cudaGetErrorString(Error));
-}
-void Send2deviceT(){
-        cudaError_t Error;
-        size_t size;
-        size = sizeof(double);
-
-        Error = cudaMemcpy(d_dt, h_dt, size, cudaMemcpyHostToDevice);
-        if (Error != cudaSuccess)
-        printf("CUDA error(copy h_dt->d_dt) = %s\n",cudaGetErrorString(Error));
-}
-void Send2hostT(){
-        cudaError_t Error;
-        size_t size;
-        size = sizeof(double);
-
-        Error = cudaMemcpy(h_dt, d_dt, size, cudaMemcpyDeviceToHost);
-        if (Error != cudaSuccess)
-        printf("CUDA error(copy d_dt->h_dt) = %s\n",cudaGetErrorString(Error));
-}
-void Send2hostK(){
-        cudaError_t Error;
-        size_t size;
-        size = sizeof(int);
-
-        Error = cudaMemcpy(h_kk, d_kk, size, cudaMemcpyDeviceToHost);
-        if (Error != cudaSuccess)
-        printf("CUDA error(copy d_Kk->h_Kk) = %s\n",cudaGetErrorString(Error));
-}
-
-/*
-void Send_to_Host(){
-	cudaError_t Error;
-        size_t size;
-        size = nx*ny*sizeof(double);
-
-        Error = cudaMemcpy(h_V, d_V, (nx+2)*(ny+2)*sizeof(double), cudaMemcpyDeviceToHost);
-        if (Error != cudaSuccess)
-        printf("CUDA error(copy d_V->h_V) = %s\n",cudaGetErrorString(Error));
-        Error = cudaMemcpy(h_m, d_m, size, cudaMemcpyDeviceToHost);
-        if (Error != cudaSuccess)
-        printf("CUDA error(copy d_m->h_m) = %s\n",cudaGetErrorString(Error));
-        Error = cudaMemcpy(h_h, d_h, size, cudaMemcpyDeviceToHost);
-        if (Error != cudaSuccess)
-        printf("CUDA error(copy d_h->h_h) = %s\n",cudaGetErrorString(Error));
-        Error = cudaMemcpy(h_jj, d_jj, size, cudaMemcpyDeviceToHost);
-        if (Error != cudaSuccess)
-        printf("CUDA error(copy d_jj->h_jj) = %s\n",cudaGetErrorString(Error));
-        Error = cudaMemcpy(h_d, d_d, size, cudaMemcpyDeviceToHost);
-        if (Error != cudaSuccess)
-        printf("CUDA error(copy d_d->h_d) = %s\n",cudaGetErrorString(Error));
-        Error = cudaMemcpy(h_f, d_f, size, cudaMemcpyDeviceToHost);
-        if (Error != cudaSuccess)
-        printf("CUDA error(copy d_f->h_f) = %s\n",cudaGetErrorString(Error));
-        Error = cudaMemcpy(h_X, d_X, size, cudaMemcpyDeviceToHost);
-        if (Error != cudaSuccess)
-        printf("CUDA error(copy d_X->h_X) = %s\n",cudaGetErrorString(Error));
-        Error = cudaMemcpy(h_cai, d_cai, size, cudaMemcpyDeviceToHost);
-        if (Error != cudaSuccess)
-	printf("CUDA error(copy d_cai->h_cai) = %s\n",cudaGetErrorString(Error));
-}
-*/
-
