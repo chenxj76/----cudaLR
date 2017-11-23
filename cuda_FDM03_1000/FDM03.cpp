@@ -304,6 +304,12 @@ int main(int argc, char* argv[])
 		*/
 		int ttt;
 				for (ttt = 1; ttt <= k; ttt++){ //from t to t+dt_max, t=t+dt
+				//这个循环能否放到GPU里实现？能用openmp实现吗？
+				/*if(k<nx*ny){
+				for (ttt = 1; ttt <= d_kk[k]; ttt++){ 
+				
+				}
+				}*/
 		//for (i = 1; i < nx + 1; i++){
 				//for (j = 1; j < ny + 1; j++){
 				gpu_ion();

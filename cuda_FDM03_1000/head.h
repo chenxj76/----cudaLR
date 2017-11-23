@@ -18,7 +18,7 @@
 
 // Time Step
 //double dt =(0.001~0.04)ms; 
-#define dt_max  0.04
+#define dt_max  0.02
 #define dt_min  0.001
 
 // Total Current and Stimulus
@@ -49,7 +49,7 @@
 //----ion.cu--------
 void gpu_ion();
 void gpu_new_gate();
-void gpu_renew_cai();
+void gpu_update_cai();
 //----voltage.cu--------
 void gpu_Boun();
 void gpuStep_1();
@@ -58,6 +58,7 @@ void gpu_stimu();
 void gpu_adaptiveT();
 void Forward_Euler();
 void gpuStep_3();
+void gpuForKK(int ncount);
 //----memory.cu--------
 void Allocate();
 void free();
@@ -67,4 +68,4 @@ void Manage_Comms(int phase);
 //void Send2deviceT();
 //void Send2hostT();
 //void Send2hostK();
-//void Send_to_Host();
+void Send_to_Host();

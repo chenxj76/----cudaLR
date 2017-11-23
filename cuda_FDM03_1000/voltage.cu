@@ -1,17 +1,31 @@
 #include "head.h"
 
+extern double *d_m;
+extern double *d_m0;
+extern double *d_h;
+extern double *d_h0;
+extern double *d_jj;
+extern double *d_jj0;
+extern double *d_d;
+extern double *d_d0;
+extern double *d_f;
+extern double *d_f0;
+extern double *d_X;
+extern double *d_X0;
+extern double *d_cai;
 
 extern double *d_t;
 extern double *d_dt;
 extern double *d_it;
 extern double *d_V;
 extern double *d_dVdt;
-extern double *d_Vnew;
+//extern double *d_Vnew;
 extern double *belta;
 extern double *y_temp;
 extern double *f;
 extern int *d_kk0, *d_kk;
 
+						
 __global__ void boundary(double *d_V){
 	int k = blockDim.x * blockIdx.x + threadIdx.x;//这是global index
 
@@ -48,10 +62,12 @@ __global__ void step_1(double *d_V ,double *belta ,double *y_temp ,double *f){
 		double eps = D / (dx*dx);
 		double eta= eps*dt_max;//这里的时间步长为什么一直是dt_max??是否应该跟着v变而变？
 		double b = 1+eta;
+		double b_1 = 1 + eta / 2;//take care the boundary value
+		double b_n = 1 + eta / 2;//take care the boundary value
 		double c = -eta/2; 
-		double c_1 = -eta;
+		//double c_1 = -eta;
 		double a = c;
-		double a_n = c_1;
+		//double a_n = c_1;
 		//double f[nx + 1][ny + 1];
 		//for (int j = 1; j < ny + 1; j++){
 			//for (int i = 1; i < nx + 1; i++){
@@ -70,9 +86,9 @@ __global__ void step_1(double *d_V ,double *belta ,double *y_temp ,double *f){
 		//double y_temp[nx + 1];
 		//for (int j = 1; j < ny + 1; j++){
 			if(i==0){
-			belta[i] = c_1 / b;
-			//y_temp[1] = f[1][j] / b;
-			y_temp[i] = f[i+nx*j] / b;    //j =0,1,2,...,n-1。  
+			belta[i] = c / b_1;
+			//y_temp[1] = f[1][j] / b_1;
+			y_temp[i] = f[i+nx*j] / b_1;    //j =0,1,2,...,n-1。  
 			}			
 			//for (int i = 2; i < nx; i++){ //i = 2,3,...,n-1
 			if(i>0&&i<nx-1){
@@ -84,7 +100,7 @@ __global__ void step_1(double *d_V ,double *belta ,double *y_temp ,double *f){
 			//}
 			//y_temp[nx] = (f[nx][j] - a_n*y_temp[nx - 1]) / (b - a_n*belta[nx - 1]);
 			if(i==nx-1){
-			y_temp[i] = (f[i+nx*j] - a_n*y_temp[i-1]) / (b - a_n*belta[i-1]);
+			y_temp[i] = (f[i+nx*j] - a*y_temp[i-1]) / (b_n - a*belta[i-1]);
 			//V[nx][j] = y_temp[nx];
 			d_V[id] = y_temp[i];
 			}
@@ -117,7 +133,11 @@ __global__ void comp_dVdt(double *d_dVdt  ,double *d_it){
 	//int j = (int)(k/nx);
 	//int id = k+(nx+2)+1+(2*j);//这是什么index？
 	//		dVdt[i][j] = -it[i][j];
-	d_dVdt[k] = -d_it[k];
+	int i, j;
+	i = (int)(k/nx);//k<nx*ny,所以i 的取值范围是（0~ny-1）。
+	j = k-i*nx;//k=ny，2ny，3ny，4ny，5ny，相邻区间总是能保证j的取值范围是（0~ny-1）。
+
+	d_dVdt[j*ny+i] = -d_it[j*ny+i];
 	}
 }	
 void gpu_dVdt(){
@@ -166,15 +186,15 @@ __global__ void adaptiveT(double *d_dVdt  ,double *d_dt,int *d_kk,int *d_kk0){
 			//for (j = 1; j < ny + 1; j++){
 				// adaptive time step
 				if (d_dVdt[k] > 0){
-					d_kk0[0] = 5;
+					d_kk0[k] = 5;
 				}else{
-					d_kk0[0] = 1;
+					d_kk0[k] = 1;
 				}
-				d_kk[0] = d_kk0[0] + (int)(fabs(d_dVdt[k]) + 0.5); //round the value此处(dVdt[k])+0.5是为了四舍五入
-				if (d_kk[0] >(int)(dt_max / dt_min)){
-					d_kk[0] = (int)(dt_max / dt_min);
+				d_kk[k] = d_kk0[k] + (int)(fabs(d_dVdt[k]) + 0.5); //round the value此处(dVdt[k])+0.5是为了四舍五入
+				if (d_kk[k] >(int)(dt_max / dt_min)){
+					d_kk[k] = (int)(dt_max / dt_min);//最多kk=40
 				}
-				d_dt[0] = dt_max / d_kk[0];
+				d_dt[k] = dt_max / d_kk[k];//这里的d_dt[0],d_kk[0]需要改为每个点的dt[k],d_kk[k].
 			//}
 		//}
 	}
@@ -193,7 +213,7 @@ __global__ void Euler(double *d_V, double *d_dVdt, double *d_dt, double *d_t){
 
 	int j = (int)(k/nx);
 	//d_Vnew[k] = d_V[k+nx+2+1+2*j] + d_dt[0]*d_dVdt[k];//index是否出问题了？
-	d_V[k+nx+2+1+2*j]= d_V[k+nx+2+1+2*j] + d_dt[0]*d_dVdt[k];
+	d_V[k+nx+2+1+2*j]= d_V[k+nx+2+1+2*j] + d_dt[k]*d_dVdt[k];
    // d_V[k+nx+2+1+2*j] = d_Vnew[k];
 
 	}
@@ -201,7 +221,7 @@ __global__ void Euler(double *d_V, double *d_dVdt, double *d_dt, double *d_t){
 	if(k==0){
 
 	d_t[0] = d_t[0] + d_dt[0];//此处必须加上数值类型，因为d_dt是一个指针，与d_t[0]是不同类型，否则报错。
-
+	//这句话暂时没什么用
 	}
 	
 }
@@ -217,7 +237,7 @@ void Forward_Euler(){
 		//*********** part of the step 2 *******
 
 		//*********** step 3, sweep in y-direction, Thomas algorithm used to solve tridiagonal linear equations ADI method*******
-__global__ void step_3(double *d_V ,double *belta ,double *y_temp ,double *f,double *d_Vnew){
+__global__ void step_3(double *d_V ,double *belta ,double *y_temp ,double *f){
 	int k = threadIdx.x + blockIdx.x * blockDim.x;
 	
 	if(k<nx*ny){
@@ -230,9 +250,11 @@ __global__ void step_3(double *d_V ,double *belta ,double *y_temp ,double *f,dou
 		double eta = dt_max*D / (dy*dy);//这里的时间步长为什么一直是dt_max??
 		double b = 1+eta;
 		double c = -eta/2;
-		double c_1 = -eta;
+		double b_1 = 1 + eta / 2;//take care the boundary value
+		double b_n = 1 + eta / 2;//take care the boundary value
+		//double c_1 = -eta;
 		double a = c;
-		double a_n = c_1;
+		//double a_n = c_1;
 		//for (i = 1; i < nx + 1; i++){
 			//for (j = 1; j < ny + 1; j++){
 				if (i==1){
@@ -250,11 +272,11 @@ __global__ void step_3(double *d_V ,double *belta ,double *y_temp ,double *f,dou
 
 		//y_temp[nx + 1] ;
 		//for (i = 1; i < nx + 1; i++){
-			//belta[1] = c_1 / b;
+			//belta[1] = c / b_1;
 			if(j==0){
-			belta[j] = c_1 / b;
+			belta[j] = c / b_1;
 			//y_temp[1] = f[i][1] / b;
-			y_temp[j] = f[i+nx*j] / b; 
+			y_temp[j] = f[i+nx*j] / b_1; 
 			}
 			//for (j = 2; j < ny; j++){ 
 			if(j>0&&j<ny-1){
@@ -264,22 +286,22 @@ __global__ void step_3(double *d_V ,double *belta ,double *y_temp ,double *f,dou
 				y_temp[j] = (f[j*nx+i] - a*y_temp[j - 1]) / (b-a*belta[j-1]);
 			}
 			//y_temp[ny] = (f[i][ny] - a_n*y_temp[ny - 1]) / (b - a_n*belta[ny - 1]);
-			if(j==ny-1){y_temp[j] = (f[j*nx+i] - a_n*y_temp[j-1]) / (b - a_n*belta[j-1]);
+			if(j==ny-1){y_temp[j] = (f[j*nx+i] - a*y_temp[j-1]) / (b_n - a*belta[j-1]);
 			//V[i][ny] = y_temp[ny];
 			d_V[id] = y_temp[j];
 			}
 			//for (j = ny - 1; j >= 1; j--){
 				//V[i][j] = y_temp[j] - belta[j] * V[i][j + 1];
-			if(j!=ny-1)d_V[id] = y_temp[j] - belta[j] * d_V[id+(nx+2)];
+			if(j!=ny-1)d_V[id] = y_temp[j] - belta[j] * d_V[id+(nx+2)]; 
 			//}
-			d_Vnew[k]=d_V[id];
+			//d_Vnew[k]=d_V[id];
 		}
 }
 void gpuStep_3(){
 	int bpg;
 	//tpb = 256;	
     bpg = (nx*ny+tpb-1)/tpb;
-	step_3<<<bpg, tpb>>>(d_V ,belta ,y_temp ,f, d_Vnew);
+	step_3<<<bpg, tpb>>>(d_V ,belta ,y_temp ,f);
 	cudaDeviceSynchronize();
 }	
 	

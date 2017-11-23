@@ -31,3 +31,15 @@ void Send_to_Host(){
 }
 */
 -arch=sm_61
+__global__ void comp_ina(double *d_V, double *d_m, double *d_h, double *d_jj, 
+		double *d_m0, double *d_h0, double *d_jj0, double *d_dt, double *d_it);
+__global__ void comp_ical(double *d_V, double *d_d, double *d_f, double *d_d0, 
+						double *d_f0, double *d_cai, double *d_dt, double *d_it);
+__global__ void comp_ik(double *d_V, double *d_X, double *d_X0, double *d_dt,double *d_it);
+__global__ void comp_ik1(double *d_V, double *d_it);
+__global__ void comp_ikp(double *d_V, double *d_it);
+__global__ void comp_ib(double *d_V, double *d_it);
+__global__ void new_gate(double *d_m, double *d_h, double *d_jj,
+						double *d_m0, double *d_h0, double *d_jj0,
+						double *d_d, double *d_f, double *d_d0, double *d_f0, 
+						double *d_X,double *d_X0);
